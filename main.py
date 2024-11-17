@@ -15,8 +15,28 @@ from eenet import EENet
 from custom_eenet import CustomEENet
 import loss_functions
 import utils
+import os
+import torch.onnx
 
-
+def save_model(args, model, epoch):
+    # Get the current working directory
+    current_dir = os.getcwd()
+    try:
+        model_save_path = os.path.join(current_dir, f"model_epoch_{epoch}.pth")
+        torch.save(model, model_save_path)
+    except:
+        print("FAILED to SAVE the pth file")
+    try: 
+        # Save the model's state_dict (parameters) to a file in the current directory
+        model_save_path_dict = os.path.join(current_dir, f"model_dict_epoch_{epoch}.pth")
+        
+        # Save the state_dict of the model
+        torch.save(model.state_dict(), model_save_path_dict)
+        print(f"Model saved at {model_save_path}")
+    except:
+        print("FAILED to SAVE the pth dict file")
+  
+    
 def main():
     """Main function of the program.
 
@@ -58,6 +78,8 @@ def main():
         # save model parameters
         if not args.no_save_model:
             utils.save_model(args, model, epoch)
+            
+
 
     # print the best validation result
     best_epoch = utils.close_history(args)
@@ -65,7 +87,16 @@ def main():
     # save the model giving the best validation results as a final model
     if not args.no_save_model:
         utils.save_model(args, model, best_epoch, True)
-
+        
+    # save the model
+    # IDK WHY THIS FAILS 
+    try:
+        print(args.no_save_model)
+        save_model(args, model, best_epoch)
+        # utils.save_model(args, model, best_epoch, True) # this throws an error
+        
+    except:
+        print("Error saving model")
     utils.plot_history(args)
 
 
@@ -111,6 +142,9 @@ def train(args, model, train_loader, optimizer, exit_tags):
         # training settings for EENet based models
         if isinstance(model, (CustomEENet, EENet)):
             pred, conf, cost = model(data)
+            # ET - Check if cost is a tuple
+            if isinstance(cost, tuple):
+                cost = list(cost)  # Convert cost to a list if it is a tuple
             cost.append(torch.tensor(1.0).to(args.device))
             cum_loss, pred_loss, cost_loss = loss_functions.loss(args, exit_tag, pred,
                                                                  target, conf, cost)
